@@ -1,0 +1,558 @@
+\documentclass{article}
+
+\usepackage{arxiv}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{lmodern}        % https://github.com/rstudio/rticles/issues/343
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{graphicx}
+
+\title{An evaluation of the Mean Residual Life Function as a visualisation tool in time to event studies}
+
+\author{
+    Shyamsundar Ranganath
+   \\
+    School of Mathematical and Statistical Sciences \\
+    University of Galway \\
+   \\
+  \texttt{} \\
+  }
+
+
+% tightlist command for lists without linebreak
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+% From pandoc table feature
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+
+% Pandoc citation processing
+%From Pandoc 3.1.8
+% definitions for citeproc citations
+\NewDocumentCommand\citeproctext{}{}
+\NewDocumentCommand\citeproc{mm}{%
+  \begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
+\makeatletter
+ % allow citations to break across lines
+ \let\@cite@ofmt\@firstofone
+ % avoid brackets around text for \cite:
+ \def\@biblabel#1{}
+ \def\@cite#1#2{{#1\if@tempswa , #2\fi}}
+\makeatother
+\newlength{\cslhangindent}
+\setlength{\cslhangindent}{1.5em}
+\newlength{\csllabelwidth}
+\setlength{\csllabelwidth}{3em}
+\newenvironment{CSLReferences}[2] % #1 hanging-indent, #2 entry-spacing
+ {\begin{list}{}{%
+  \setlength{\itemindent}{0pt}
+  \setlength{\leftmargin}{0pt}
+  \setlength{\parsep}{0pt}
+  % turn on hanging indent if param 1 is 1
+  \ifodd #1
+   \setlength{\leftmargin}{\cslhangindent}
+   \setlength{\itemindent}{-1\cslhangindent}
+  \fi
+  % set entry spacing
+  \setlength{\itemsep}{#2\baselineskip}}}
+ {\end{list}}
+\usepackage{calc}
+\newcommand{\CSLBlock}[1]{#1\hfill\break}
+\newcommand{\CSLLeftMargin}[1]{\parbox[t]{\csllabelwidth}{#1}}
+\newcommand{\CSLRightInline}[1]{\parbox[t]{\linewidth - \csllabelwidth}{#1}\break}
+\newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}
+
+\usepackage{titlesec}
+\usepackage{placeins}
+\usepackage{float}
+\makeatletter
+\newcommand{\pandocbounded}[1]{\begin{figure}[H]#1\end{figure}}
+\makeatother
+\setcounter{tocdepth}{2}
+\usepackage{etoolbox}
+\AtBeginDocument{\tableofcontents\newpage}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{pdflscape}
+\usepackage{tabu}
+\usepackage{threeparttable}
+\usepackage{threeparttablex}
+\usepackage[normalem]{ulem}
+\usepackage{makecell}
+\usepackage{xcolor}
+\begin{document}
+\maketitle
+
+
+\begin{abstract}
+This report introduces the Mean Residual Life (MRL) function as a clinically relevant alternative to the traditional Kaplan-Meier (KM) survival plot in breast cancer survival analysis. Using clinical time-to-event data from the TCGA-BRCA cohort, we generated survival visualizations including KM, MRL, and associated difference plots. We conducted a structured online survey among medical students and clinicians to assess their ability to interpret and rank these plots before and after a learning intervention. Results revealed that while KM plots were the most familiar and easiest to interpret, MRL plots significantly improved in interpretability following training. The findings suggest that MRL functions can serve as an intuitive and time-based alternative in clinical decision-making, provided that clinicians receive appropriate guidance on their use.
+\end{abstract}
+
+\keywords{
+    Survival analysis
+   \and
+    Kaplan-Meier
+   \and
+    Time-to-event
+   \and
+    R
+  }
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{Introduction}\label{introduction}
+
+\subsubsection{Background information}\label{background-information}
+
+Time-to-event or majorly known as survival analysis in which the analysis is carried out on data in the form of time origin until a particular event occurs or until there is a end point. The Survival data are asymmetric and censored which requires the use of specific approaches such as the survival function, Kaplan Meier Estimator and Survival Ratio plot. (Kaplan and Meier 1958; Berg, Thijs, and Heijden 2021).
+
+The survival function can be defined as the probability that a survival time is greater than or equal to time (t). This is the observed value of the random variable T that has the distribution function F(t).
+
+The survival function is defined as \(\mathbf{S}(t) = \mathbf{P}(\mathbf{T} \geq t)\). This represents the probability that a patient survives beyond a time t.This plays a crucial role in analyzing the time to death or the disease progression in these patients. (Bland and Altman 2004).
+
+\subsubsection{Problem Statement}\label{problem-statement}
+
+The primary interest of our study is to analyze these survival outcomes by using novel informative visualizations of the time to event data and in particular by comparing the survival curves that have different co-variates or treatments in a trial. (Kaplan and Meier 1958; Berg, Thijs, and Heijden 2021).
+
+Very often, The Kaplan Meier plot and the Survival Ratio plot can be very challenging for clinicians to interpret as these plots are represented in terms of probability and cannot be explained in a straight forward manner to the patients. An alternative method for this is by introducing the clinicians to mean residual life in order to ensure that the interpretability can be significantly improved. (Chen, Ibrahim, and Sinha 2019; Cai and Zheng 2010).
+
+The mean residual life provides the output in terms of units of time as opposed to probabilities.This makes it easier for the clinicians to convey the outcome as to how much longer the patient will survive. (Peterson et al. 2012).
+
+In order to evaluate the knowledge and the preferences of medical doctors and students on the time to event, an online survey is conducted. This helps us in ranking which plots the clinicians would find it more easy and understandable to convey to the patient.
+
+\subsubsection{Understanding the Mean Residual Life}\label{understanding-the-mean-residual-life}
+
+The Mean Residual Life function is denoted as the expected remaining time until an event of interest occurs. The event can be time-to-death, time-to-relapse given that the patient has survived up and till a time t. (Chen, Ibrahim, and Sinha 2019; Cai and Zheng 2010).
+
+The Mean Residual Life function is denoted as \(\mathbf{MRL}(t) = \mathbb{E}[\mathbf{T} - t \mid \mathbf{T} \geq t] = \frac{1}{\mathbf{S}(t)} \int_t^{\infty} \mathbf{S}(u)\,du\).
+
+The terms are:\\
+(a) \(\mathbf{T}\) --- Time to event.\\
+(b) \(\mathbf{f}(t)\) --- The probability density function of event times.\\
+(c) \(\mathbf{S}(t)\) --- The survival function.
+(Berg, Thijs, and Heijden 2021).
+
+\subsubsection{Interpretation in Medical Context}\label{interpretation-in-medical-context}
+
+In clinical settings, The MRL provides a more accurate summary of survival compared to the traditional methods like Kaplan Meier or hazard function. This is mainly because MRL expresses the prognosis in units of time and hence our question ``If a patient has survived t years, how much more are they expected to live on an average?'' is answered.
+
+In the context of breast cancer, the Mean Residual Life provides a time based view of the expected survival time in the future. Also this allows for direct comparisons between two groups taking into account remaining survival time at various time points.
+
+The approach is completely transformed from ``probability of survival'' to ``expected remaining time which enhances decision making and is useful in follow ups.
+
+The another interesting thing is that these MRL plots can be combined with the the traditional methods that are the Kaplan Meier,Ratio plot to provide clinicians with a clearer picture of patient progression. (Therneau and Grambsch 2020).
+
+\section{Literature Review}\label{literature-review}
+
+\subsubsection{Survival Analysis in Health Research}\label{survival-analysis-in-health-research}
+
+Survival Analysis is one of the core methods used in research when the primary outcome is the time-to-event or death. Unlike other models,There are censored values within the data. Censored data is the case where the patient/patients do not experience the event during the time of the study.
+
+The most used techniques which are the KM estimator estimate the effect of the co-variates on the survival time without assuming an underlying baseline hazard here by helping to quantify different survival times and as well as comparing the results between the various treatment groups. (Kaplan and Meier 1958).
+
+\subsubsection{Hazard Function and It's Clinical Implications}\label{hazard-function-and-its-clinical-implications}
+
+The hazard function provides a rate at which the events occur up to a survival time t. In clinical sectors, this helps in gaining a foothold as to how recurrence risk changes over time. The two possible outcomes are it increasing due to the progression of the disease or it decreases due to effective treatment.
+
+In this study pertaining to breast cancer, the hazard rates are not monotic: They are high after diagnosis or surgery and are low during remission and hence rising again later on. Identifying the patterns influence the follow up schedules and treatment intensities.(Berg, Thijs, and Heijden 2021).
+
+\subsubsection{Mean Residual Life in Biomedical Studies}\label{mean-residual-life-in-biomedical-studies}
+
+As mentioned earlier, mrl gives the expected remaining lifetime of a subject, given that the subject has survived up to a time period of T.
+
+MRL is useful when the subject wishes to know the progression in terms of units of time as opposed to probabilities.This makes it easier for both the clinicians and the subjects to conversate the various survival outcomes.
+
+Some of the real world data sets where MRL is heavily utilized is of Lung and Colorectal cancer,Cardiovascular risk assessment and HIV survival analysis.
+
+On the other side, MRL remains under utilized in real world data sets (Chen, Ibrahim, and Sinha 2019). This project plugs in the gaps by applying the Mean Residual Life function to clinical data and gaining insights to clinical interpretations through a online based visualisation survey. (Chen, Ibrahim, and Sinha 2019).
+
+\subsubsection{Covariate Modelling in Breast Cancer Survival}\label{covariate-modelling-in-breast-cancer-survival}
+
+The various factors that influence the Breast Cancer are clinical, demographic and molecular factors. Well known prognostic factors include:
+(a) Tumor size and grade.
+(b) Lymph node development.
+(c) Presence of M1(Metasis).
+(d) The stage of the diagnosis.
+
+The patients that were diagnosed at the earliest stage that is stage 1, tended to have longer survival in contrast with those who were diagnosed at stage 3 and stage 4.
+
+The demographic variables are age, race and ethnicity. These impact the survival that are often mediated by access to care and treatment. The dataset used in this study are present with many of these co variates which help in a more accurate modelling of these survival outcomes. (Therneau and Grambsch 2020).
+
+\subsubsection{Use of R in Clinical Survival Modelling}\label{use-of-r-in-clinical-survival-modelling}
+
+R comes with various and wide range of packages that help in performing survival analysis as it is an open source software with a rich set of libraries within each package.
+
+the key packages used in this study or that are widely used for survival analysis are:
+
+(a)\textbf{Survival and survminer-For Kaplan Meier and Cox PH models}.
+
+(b)\textbf{ggplot2 and plotly-For publishing the visualisations for interactive purposes}
+
+(c)\textbf{mrlplot along with custom code for estimating and visualizing the Mean Residual Life functions}.
+
+Despite survival analysis being well framed, there are very few and only few studies that integrate statistical modelling, MRL visualisation and clinician feedback into a single work and this project is one such example where combining all these help enhance the effect and relevance of survival analysis in real world healthcare scenarios. (Therneau and Lumley 2022).
+
+\section{Dataset Overview}\label{dataset-overview}
+
+The data that is used in this study is TCGA-BRCA(Breast Invasive Carcinoma). This data set is available publicly from the National Cancer Institute's Genomic Data Commons. A detailed demographic, clinical and pathological data on patients that are diagnosed with breast cancer are provided.These also include clinical outcomes and survival modeling.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.2237}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.7763}}@{}}
+\caption{Table: Key Variables in the Clinical Dataset}\tabularnewline
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Variable
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Description
+\end{minipage} \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Variable
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Description
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+vital\_status & Patient outcome: whether the patient was alive or deceased \\
+time & Time from diagnosis to event or censoring (in days) \\
+time\_in\_years & Time to event or censoring converted to years \\
+pathologic\_stage & Overall pathological stage (e.g., Stage I, II, III, IV) \\
+pathologic\_t & Tumor size category (T1--T4) \\
+pathologic\_n & Lymph node involvement category (N0--N3) \\
+pathologic\_m & Presence or absence of metastasis (M0/M1) \\
+gender & Patient gender \\
+race & Self-reported race \\
+ethnicity & Self-reported ethnicity \\
+\end{longtable}
+
+\subsubsection{Summary of the cohort}\label{summary-of-the-cohort}
+
+\begin{enumerate}
+\def\labelenumi{(\alph{enumi})}
+\item
+  \textbf{Cohort Size:} The dataset includes 1,084 breast cancer patients.
+\item
+  \textbf{Event Type:} The primary event that is taking place here is death, while censored data might being present, which tells us the patients who were alive at the time of the last follow-up.
+\item
+  \textbf{Censoring Proportion:} The number of patients that were censored was approximately 0\% (i.e., no patients were censored in this dataset).
+\item
+  \textbf{Survival Time Range:} The survival time ranges from 0.0 to 23.56 years, with a median follow-up of 2.2 years.
+\end{enumerate}
+
+\subsubsection{Preprocessing notes}\label{preprocessing-notes}
+
+\begin{enumerate}
+\def\labelenumi{(\alph{enumi})}
+\tightlist
+\item
+  Patients with missing values in critical fields such as event status or time were excluded.\\
+\item
+  The time values were converted to a column named \texttt{time\_in\_years} to improve clinical interpretability.\\
+\item
+  Staging variables were grouped where appropriate to allow for stratified survival analysis.
+\end{enumerate}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.0598}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.0513}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1966}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1111}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1453}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.0684}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.0855}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.0684}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1026}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1111}}@{}}
+\caption{First Six Rows of the Breast Cancer Dataset}\tabularnewline
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Gender
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Race
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Ethnicity
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+Vital Status
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Pathologic Stage
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+T Stage
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+N Stage
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+M Stage
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+Time (Days)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+Time (Years)
+\end{minipage} \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Gender
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Race
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Ethnicity
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+Vital Status
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Pathologic Stage
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+T Stage
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+N Stage
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+M Stage
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+Time (Days)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+Time (Years)
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+female & White & not hispanic or latino & 0 & Stage I & T1c & N0 (mol+) & M0 & 337 & 0.9226557 \\
+female & White & not hispanic or latino & 0 & Stage I & T1c & N0 & M0 & 259 & 0.7091034 \\
+female & White & not hispanic or latino & 0 & Stage II & T2 & N1mi & M0 & 3102 & 8.4928131 \\
+female & White & not hispanic or latino & 0 & Stage II & T2 & N0 & M0 & 5 & 0.0136893 \\
+female & White & not hispanic or latino & 0 & Stage I & T1c & N0 (i-) & MX & 759 & 2.0780287 \\
+female & White & not hispanic or latino & 0 & Stage III & T3 & N1a & MX & 954 & 2.6119097 \\
+\end{longtable}
+
+\section{Methods}\label{methods}
+
+\subsubsection{Data Preparation and Event Coding}\label{data-preparation-and-event-coding}
+
+The dataset was first checked and was then cleaned thoroughly so as to ensure that the factor levels were consistent. This consistency is needed especially for the categorical variables pathologic\_stage, pathologic\_t, pathologic\_n and pathologic\_m. The outcome variable, which is survival time, was measured in years and the event indicator was inferred from the vital\_status variable. Patients who were coded as 1 were considered as Dead and those who were coded 0 were considered as Alive. There was a event indicator that had been obtained from the vital status variable with censoring being applied to those patients who were alive at the time of the last follow up.
+
+\subsubsection{Survival Analysis techniques}\label{survival-analysis-techniques}
+
+\subsubsection{Kaplan-Meier Estimation}\label{kaplan-meier-estimation}
+
+This estimator was used to non-parametrically estimate the survival function for the cohort and for each of the subgroups that were stratified by pathologic stage. Also we applied a log ranked test in order to check for significant differences between the groups.
+
+In survival analysis the Kaplan-meier curves were selected was due to their familiarity and broad usage in clinical settings. (Kaplan and Meier 1958).
+
+\subsubsection{Mean Residual Life Curves}\label{mean-residual-life-curves}
+
+The Mean Residual Life Curves represent the expected remaining survival time given that the subject has survived till time `t'. It is defined as:
+\[
+MRL(t) = \frac{1}{S(t)} \int_t^{\infty} S(u)\,du
+\]
+
+The curves were represented by pathologic stage to visualise the differences in the expected life time remaining. (Chen, Ibrahim, and Sinha 2019).
+
+\subsubsection{Difference Plots}\label{difference-plots}
+
+There were mainly two types of difference plots that were used, one was based on the survival probabilities and the other one purely based on Mean Residual Life. In each of the scenarios, a reference group mainly stage 1 was selected and either the survival or the mrl function of the other groups was subtracted from it. These difference plots improved the interpretability of the survival trends across all the disease stages and helped in communicating the differences more easily to the clinicians. (Cai and Zheng 2010).
+
+\subsubsection{Survey for Clinical feedback}\label{survey-for-clinical-feedback}
+
+\subsubsection{Purpose}\label{purpose}
+
+The purpose of conducting a survey was to figure out which of the Survival Plots were most preferred and were easy to interpret from a clinician's perspective to a patient. This helps in more advanced survival visualisations in the real-world setting.
+
+\subsubsection{Survey Overview}\label{survey-overview}
+
+The following were the components that were used in the survey:
+
+(a)Target Population: This mainly focused on the Medical Students and Doctors.
+
+(b)Data Collection: The data was collected anonymously from Google forms.
+
+(c)Convenience Sampling: This was done voluntarily and without any randomization.
+
+(d)Collection Period: The survey was conducted for 5 weeks ranging from 15th April 2025 to 20th May 2025.
+
+\subsubsection{Survey Structure}\label{survey-structure}
+
+The survey was organized into the following structure:
+
+(a)The Demographic information such as Country and Qualification were collected and before that the participants were asked to rate their knowledge on a scale of 1 to 10 with 1 being that the participant has no knowledge and 10 being that the participant has expert knowledge.
+
+(b)Participants were then presented with different types of visualisations of time-to-event data being Kaplan-Meier Plot, Survival difference plot, Mean Residual Life plot and Mean Residual Life Difference plot and were asked to provide their interpretation of these plots.This can be called as a Pre-assessment.
+
+(c)After completing the Pre-assessment, the actual and correct interpretations were provided so as to encourage learning and gain a foothold as to what each of the plots were trying to convey. This can be termed as Learning Section.
+
+(d)A new set of plots of the same type were provided but for different groups after learning about the interpretations of the pre assessment plots in the learning section.This was the Post-assessment.
+
+(e)After completing the Post assessment section. The participants were asked to rank the plots based on the level of understanding by clinicians ranging from easy to hard and then they were asked which plot would the clinician prefer to use in order to convey it to the patient in the simplest manner possible.
+
+(Peterson et al. 2012).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{workflow.png}
+  \caption{Workflow diagram illustrating the survival analysis process.}
+  \label{fig:workflow}
+\end{figure}
+
+\section{Results}\label{results}
+
+This presents the results across the different pathologic groups of Breast Cancer. These methods include both the traditional as well as alternative and time based visualisations that were used to provide a detailed view of the patient outcomes.The clinical survey feedback is then reported in order to determine the interpretability of each of the four plots.
+
+\subsubsection{Kaplan Meier Survival Estimates}\label{kaplan-meier-survival-estimates}
+
+The Kaplan Meier analysis showed us that there is a significant difference in the survival probability across all the pathologic stages. The log rank p value is \textless{} 0.0001.The patients with Stage 1 of the disease exhibited the most ideal survival trajectory and hence they maintain the highest survival probability over time.On the other hand, stage 4 showed the lowest of all the outcomes such as a rapid decline in the starting years. The Stage 2 and Stage 3 patients generated a hierarchy with stage 3 constantly performing poorly over stage 2. The divergence among the curves got widened as time progressed. Hence we can say that the early stage patients(stage 1 and stage 2) showed a better long term survival compared to patients in stage 3 and stage 4. (Bland and Altman 2004).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{km_curve.png}
+  \caption{Kaplan Meier plot for pathologic stages.}
+  \label{fig:km_curve}
+\end{figure}
+
+\subsubsection{Mean Residual Life Curves}\label{mean-residual-life-curves-1}
+
+The Mean Residual Life Curves reveal that at time zero, stage 1 shows better initial mean residual life which shows a better life expectancy. On the other side, stage 4 shows the lowest initial mean residual life. This shows a lower life expectancy for the stage 4 patients. A stage dependent gradient is shown with earlier stages showing higher residual survival probabilities as time progresses. The stage 3 and stage 4 patients show a sharp decline especially, within 3 to 5 years.The convergence of the curves at later time points makes us to conclude that the long term survivors experience stage independent residual survival. stage 1 patients maintain the highest life expectancy. This does reinforce the pathological stage as a crucial determinant of immediate as well as prognosis that is time-conditioned with implications for risk adapted clinical follow ups. (Pencina et al. 2004).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{mrl_plot.png}
+  \caption{MRL plot for pathologic stages.}
+  \label{fig:mrl_plot}
+\end{figure}
+
+\subsubsection{Survey Results}\label{survey-results}
+
+The total number of responses that were analyzed were 32 in number. Out of these 75\% of the participants rate themselves less than equal to 5 out of 10 in terms of their knowledge on survival analysis. The Data Analysis was done using Nvivo and mainly R studio.
+
+\subsubsection{Pre-assessment}\label{pre-assessment}
+
+The bar plot undermines the initial ability of the participants as to how they interpret each of the visualisations. This was the pre-assessment section. The Kaplan-Meier plot was having the highest proportion of correct interpretation approximately 74 percent and hence showcasing the familiarity and it's wide use in clinical training and literature. The Mean Residual Life Difference plot had the lowest correct interpretations approximately 38 percent indicating that it is hard to interpret them without any prior exposure or knowledge.The Mean Residual Life plot as well as the Survival difference plot were sparingly understood with both of them achieving a correct interpretation of 52 percent. Overall, this pre-test results make it clear that there has to be a improvement in the training as well as the exposure of the participants to these plots so as to ensure higher scores of correct interpretation are achieved. This also justifies the main learning component of this study and as well as the rationale for marking the post learning success alongside the preferences of the clinicians.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{pre_post_comparison.png}
+  \caption{pre vs post comparison plot.}
+  \label{fig:pre_post_comparison.png}
+\end{figure}
+
+\subsubsection{Post assessment}\label{post-assessment}
+
+After providing the learning intervention, there was a improvement in the Kaplan-Meier plot by 10 percent from 74 percent to 84 percent. The Mean Residual life difference plot performed poorly,decreasing from approximately 38 percent to 24 percent. There was a significant improvement in the Mean Residual Life plot from 52 percent to 74 percent. The survival difference plot underperformed from 52 percent to 39 percent. We can conclude that providing a learning intervention was useful as there was a significant improvement especially in the Kaplan Meier plot and the Mean Residual Life plot with the Mean Residual Plot being the rationale and main focus of our study.
+
+\pandocbounded{\includegraphics[keepaspectratio]{Report_files/figure-latex/unnamed-chunk-24-1.pdf}}
+
+\subsubsection{Pre test}\label{pre-test}
+
+The Decision tree suggests that participants who found the mean residual life plot easy to interpret performed the worst which is shown as it achieves a score of 25 percent. This suggests possible over confidence had a effect on their interpretation. On the other side, participants who ranked the mean residual life as difficult performed better. The 100 percent accuracy happend in the rare group who found both the mean residual life and survival difference plots difficult to interpret. The largest group achieved a accuracy of 69 percent by identifying the complexity of the mean residual life and survival difference plots. The participants who found survival difference plots easy, completely misinterpreted the mean residual Life plot(33 percent accuracy). This pattern suggests that the association between the mean residual life and survival difference concepts acts as a strong predictor for the success of interpretation.
+
+\subsubsection{Post test}\label{post-test}
+
+After providing the learning intervention for the Mean Residual Life plot, For the 10 percent that found survival difference plots easy, Only 33 percent interpreted the Mean Residual life correctly. There was no improvement despite giving them formal exposure. On the other hand, 90 percent of them who found the survival difference plots moderately or difficult to understand, 78 percent of them interpreted the mean residual life correctly after the intervention. This justifies that the training was very much effective for this majority group.
+
+\begin{figure}
+
+{\centering \includegraphics{Report_files/figure-latex/unnamed-chunk-26-1} 
+
+}
+
+\caption{Decision Tree – Post-Test Interpretation of MRL}\label{fig:unnamed-chunk-26}
+\end{figure}
+
+\subsubsection{Rankings}\label{rankings}
+
+The Faceted Bar chart showed that the kaplan meier plot was constantly ranked as the most easiest to understand and was most ideal for communicating with the patient as evidenced by many of the participants ranking it as 1. This justifies the fact that the kaplan meier is widely used in clinical sectors as compared to any other plots. The mean residual life Plot also showed a decent distribution with majority of the participants ranking it 2 or 3 in both of the categories. This indicates a very brief clarity and it's usefulness in Medical companies.
+
+The mean residual life difference plot was mostly ranked 4 which indicates that clinicians find it the hardest to understand and usually tend to give it the least preference. The survival difference plot had mixed ranking distribution but again it was ranked lower in terms of it's understanding. Overall, this justifies the fact that the more traditional visualisations like the Kaplan Meier are vastly preferred by clinicians, the more recent visualisations like the mean residual life and the difference plots require a further simplification so that it can be more easily understood and implemented strongly in clinical practice.
+
+```
+
+\begin{center}\includegraphics[width=1\linewidth]{ranking_distribution} \end{center}
+
+\section{Discussion}\label{discussion}
+
+\subsubsection{Strengths}\label{strengths}
+
+This study has several strengths to the literature on survival data visualisations in the clinical settings. It adopts a novel application of mixed method research that combines both the quantitative analysis along with the qualitative analysis that are gathered through the responses for the survey. This approach provides both improvements in the interpretation and insights into participant's preferences.
+
+Also, primary and real world insights are provided from induvidual clinicians as well as medical trainers instead of relying on expert panels or evaluations that might be simulated. This refines the relevance of the findings for educational purposes and clinical practice scenarios where understanding and communicating the survival data correctly play a vital role.
+
+Lastly, the inclusion of the mean residual life plot and mean residual life difference plots provides the potential for broader tools to be implemented in clinical decision making and underlines the need for the data visualisation that is accessible in patient communication. (Therneau and Lumley 2022).
+
+\subsubsection{Limitations}\label{limitations}
+
+The study used a convenience sampling method and the data collection process was conducted in a uncontrolled setting which might lead to selection bias which in turn limits the internal validity as the participants were not randomly selected.
+
+The sample size was small and was limited to medical students or clinicians only. This reduces the generalisability of the findings to more diverse or international clinicians.
+
+Addtionaly, the data collection period lasted for only 5 weeks which
+hampered the opportunity for repeated participation or follow up. The learning intervention showed positive signs in the post assessment phase, but the long term retention of the interpretation skills for visualisation was not assessed. (Therneau and Grambsch 2020).
+
+\section{Conclusion}\label{conclusion}
+
+This study shows that there is a significant gap in terms of the interpretation of the survival plots among the medical students and doctors.The traditional plots like the kaplan meier plot remained the most familiar and easy to understand as compared to the alternative plots particularly the mean residual life plot which showed learning effects. The mean residual life function was showed that it can be learnt as there is evidence in the improvement in the interpretation of the mean residual life plot after providing the participants with the learning intervention. This suggested that the medical students and clinicians would be able to quickly grasp and apply them hence making them a notable addition to the range of tools that are used to communicate the survival tools.
+
+All of these findings need to complement the conventional visual tools with strategies in the educational sector that introduce these informative yet underutilisied visualisations. By providing proper training, the clinicians can improve their communication with the patients in a more professional manner and not only their own understanding.
+
+While the kaplan meier plots remain the most preferred and can be easily communicated due to it's familiarity and use, the mean residual life plot offers a strong potential
+in such a way that it can be incorporated into clinical decsion making by ensuring that their interpretability is supported by providing more simplified presntation formats.
+
+\section*{References}\label{references}
+\addcontentsline{toc}{section}{References}
+
+\phantomsection\label{refs}
+\begin{CSLReferences}{1}{0}
+\bibitem[\citeproctext]{ref-vandenberg2021hazard}
+Berg, Martijn H van den, Amelie Thijs, and Gerard JMG van der Heijden. 2021. {``Visualizing Hazard Functions: Enhancing Interpretability in Clinical Risk Communication.''} \emph{Journal of Clinical Epidemiology} 138: 45--52.
+
+\bibitem[\citeproctext]{ref-bland2004log}
+Bland, Martin, and Douglas Altman. 2004. {``The Logrank Test.''} \emph{BMJ} 328 (7447): 1073.
+
+\bibitem[\citeproctext]{ref-cai2010mrl}
+Cai, Jianwen, and Jiajia Zheng. 2010. {``Estimation of Mean Residual Life Under Censoring and Truncation.''} \emph{Statistics in Medicine} 29 (11): 1180--92.
+
+\bibitem[\citeproctext]{ref-chen2019mrl}
+Chen, Yi, Joseph G Ibrahim, and Debajyoti Sinha. 2019. {``Modeling Mean Residual Life in the Presence of Competing Risks.''} \emph{Biometrics} 75 (2): 558--67.
+
+\bibitem[\citeproctext]{ref-kaplan1958nonparametric}
+Kaplan, Edward L, and Paul Meier. 1958. {``Nonparametric Estimation from Incomplete Observations.''} \emph{Journal of the American Statistical Association} 53 (282): 457--81.
+
+\bibitem[\citeproctext]{ref-pencina2004lifetime}
+Pencina, Michael J, Ralph B D'Agostino, Martin G Larson, Joseph M Massaro, and Ramachandran S Vasan. 2004. {``General Cardiovascular Risk Profile for Use in Primary Care: The Framingham Heart Study.''} \emph{Circulation} 117 (6): 743--53.
+
+\bibitem[\citeproctext]{ref-peterson2012graphs}
+Peterson, Edward, Karen Gamo, Sumitra Saha, Trevor Faulkner, and Peter Novotny. 2012. {``Graphs in Print: A Survey of Medical Graphical Literacy.''} \emph{Annals of Internal Medicine} 157 (5): 385--88.
+
+\bibitem[\citeproctext]{ref-therneau2020cox}
+Therneau, Terry M, and Patricia M Grambsch. 2020. \emph{Modeling Survival Data: Extending the Cox Model}. 2nd ed. New York: Springer.
+
+\bibitem[\citeproctext]{ref-therneau2022survival}
+Therneau, Terry M, and Thomas Lumley. 2022. {``A Package for Survival Analysis in r.''} \url{https://cran.r-project.org/package=survival}.
+
+\end{CSLReferences}
+
+\bibliographystyle{unsrt}
+\bibliography{references.bib}
+
+
+\end{document}
