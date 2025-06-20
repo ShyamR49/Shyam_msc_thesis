@@ -1,0 +1,390 @@
+
+### Overview of the dataset
+```{r include=FALSE}
+surv_brca_cli <- read.csv("C:/Users/shyam/Downloads/surv_brca_cli.csv")
+surv_brca_cli
+```
+
+```{r include=FALSE}
+library(knitr)
+library(dplyr)
+library(kableExtra)
+```
+
+```{r echo=FALSE}
+### key variables
+variables <- data.frame(
+  Variable = c("vital_status", "time", "time_in_years", "pathologic_stage", 
+               "pathologic_t", "pathologic_n", "pathologic_m", "gender", 
+               "race", "ethnicity"),
+  Description = c("Patient outcome: whether the patient was alive or deceased",
+                  "Time from diagnosis to event or censoring (in days)",
+                  "Time to event or censoring converted to years",
+                  "Overall pathological stage (e.g., Stage I, II, III, IV)",
+                  "Tumor size category (T1–T4)",
+                  "Lymph node involvement category (N0–N3)",
+                  "Presence or absence of metastasis (M0/M1)",
+                  "Patient gender",
+                  "Self-reported race",
+                  "Self-reported ethnicity")
+)
+
+kable(variables, caption = "Table: Key Variables in the Clinical Dataset")
+
+
+### First 6 rows of the dataset
+
+
+```{r echo=FALSE}
+kable(
+  head(surv_brca_cli),
+  caption = "First Six Rows of the Breast Cancer Dataset",
+  col.names = c(
+    "Gender",
+    "Race",
+    "Ethnicity",
+    "Vital Status",
+    "Pathologic Stage",
+    "T Stage",
+    "N Stage",
+    "M Stage",
+    "Time (Days)",
+    "Time (Years)"
+  )
+)
+```
+
+
+###Mean residual life formula
+$$
+MRL(t) = \frac{1}{S(t)} \int_t^{\infty} S(u)\,du
+$$
+
+### graph depicting workflow
+```{r include=FALSE}
+library(DiagrammeR)
+library(rsvg)
+library(DiagrammeRsvg)
+```
+
+```{r echo=FALSE}
+# Create and export workflow
+graph <- grViz("
+digraph workflow {
+  graph [layout = dot, rankdir = TB]
+  node [shape = box, style=filled, fontsize=12, fontname=Helvetica]
+
+  A [label = 'Data Cleaning', fillcolor = lightblue]
+  B [label = 'Create Survival Object', fillcolor = lightblue]
+  C1 [label = 'Kaplan–Meier Plot', fillcolor = lightblue]
+  C2 [label = 'Mean Residual Life Plot', fillcolor = lightblue]
+  D [label = 'Difference Plot', fillcolor = orange]
+  E [label = 'Survey Feedback', fillcolor = salmon]
+
+  A -> B
+  B -> C1
+  B -> C2
+  C1 -> D
+  C2 -> D
+  D -> E
+}
+")
+```
+
+```{r echo=FALSE}
+graph %>%
+  export_svg() %>%
+  charToRaw() %>%
+  rsvg_png("workflow.png")
+```
+
+
+
+###code for Kaplan Meier plot
+```{r include=FALSE}
+library(survival)
+library(survminer)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(purrr)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Create the Surv object
+surv_obj <- Surv(time = surv_brca_cli$time_in_years, event = surv_brca_cli$vital_status)
+
+# Fit Kaplan-Meier model
+km_fit <- survfit(surv_obj ~ pathologic_stage, data = surv_brca_cli)
+
+# Save plot object
+km_plot <- ggsurvplot(km_fit, data = surv_brca_cli, 
+                      pval = TRUE,
+                      title = "Kaplan-Meier Plot",
+                      xlab = "Time (Years)",
+                      ylab = "Survival Probability",
+                      font.main = c(10, "bold"),
+                      font.x = c(9),
+                      font.y = c(9),
+                      font.tickslab = 8)
+```
+
+
+```{r echo=FALSE}
+ggsave("km_curve.png", plot = km_plot$plot, width = 7, height = 5, dpi = 300)
+```
+
+
+```{r,include=FALSE}
+knitr::include_graphics("km_curve.png")
+```
+
+
+###code for Mean residual life curve
+
+
+```{r warning=FALSE, include=FALSE}
+# Filter to include only the main clinical stages and Stage X
+surv_brca_cli <- surv_brca_cli %>%
+  filter(pathologic_stage %in% c("Stage I", "Stage II", "Stage III", "Stage IV", "Stage X"))
+
+# Ensure pathologic_stage is a factor
+surv_brca_cli$pathologic_stage <- as.factor(surv_brca_cli$pathologic_stage)
+
+#Function to compute Mean Residual Life (MRL) from survfit
+compute_mrl <- function(fit) {
+  tidy_fit <- broom::tidy(fit)
+  tidy_fit <- tidy_fit %>%
+    mutate(
+      step = lead(time, default = max(time)),
+      interval = step - time,
+      integral = interval * estimate
+    )
+  tidy_fit$mrl <- rev(cumsum(rev(tidy_fit$integral))) / tidy_fit$estimate
+  tidy_fit <- tidy_fit %>% select(time, estimate, mrl)
+  return(tidy_fit)
+}
+
+#Compute MRL curves for each stage
+mrl_data <- surv_brca_cli %>%
+  group_by(pathologic_stage) %>%
+  group_split() %>%
+  map_df(~{
+    stage <- unique(.x$pathologic_stage)
+    message(paste("Computing MRL for:", stage))
+    fit <- survfit(Surv(time_in_years, vital_status) ~ 1, data = .x)
+    compute_mrl(fit) %>%
+      mutate(pathologic_stage = stage)
+  })
+
+# Truncate long follow-up times for visual clarity
+mrl_data <- mrl_data %>% filter(time <= 15)
+
+# Smooth the MRL curves using loess (only where enough points exist)
+mrl_smoothed <- mrl_data %>%
+  group_by(pathologic_stage) %>%
+  filter(!is.na(mrl), is.finite(mrl)) %>%
+  filter(n() > 5) %>%
+  mutate(mrl_smooth = loess(mrl ~ time, span = 0.4)$fitted)
+
+# Create the plot object
+mrl_plot <- ggplot(mrl_smoothed, aes(x = time, y = mrl_smooth, color = pathologic_stage)) +
+  geom_line(size = 1.2) +
+  labs(
+    title = "Mean Residual Life Plot",
+    x = "Time (Years)",
+    y = "Mean Residual Life (Years)",
+    color = "Pathologic Stage"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "right")
+```
+
+```{r include=FALSE}
+#Save the plot as a high-resolution image
+ggsave("mrl_plot.png", plot = mrl_plot, width = 4, height = 5, dpi = 150)
+```
+
+```{r include=FALSE}
+knitr::include_graphics("mrl_plot.png")
+```
+
+
+### Pre vs post comparison bar chart
+
+```{r include=FALSE}
+survey_data<-read.csv("C:/Users/shyam/Downloads/Pre_and_post_responses_final.csv")
+survey_data
+```
+
+```{r include=FALSE}
+library(tibble)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(rpart)
+library(rpart.plot)
+```
+
+```{r include=FALSE}
+# Combine pre- and post-test results
+combined_summary <- tibble(
+  Plot = rep(c("Kaplan–Meier", "Survival Difference", "Mean Residual Life", "MRL Difference"), each = 2),
+  Phase = factor(rep(c("Pre-Test", "Post-Test"), times = 4), levels = c("Pre-Test", "Post-Test")),
+  Proportion_Correct = c(
+    mean(survey_data$Pre_KM_Correct, na.rm = TRUE),
+    mean(survey_data$Post_KM_Correct, na.rm = TRUE),
+    mean(survey_data$Pre_Diff_Correct, na.rm = TRUE),
+    mean(survey_data$Post_Diff_Correct, na.rm = TRUE),
+    mean(survey_data$Pre_MRL_Correct, na.rm = TRUE),
+    mean(survey_data$Post_MRL_Correct, na.rm = TRUE),
+    mean(survey_data$Pre_MRL_Diff_Correct, na.rm = TRUE),
+    mean(survey_data$Post_MRL_Diff_Correct, na.rm = TRUE)
+  )
+)
+```
+
+```{r echo=FALSE}
+# Create plot object
+combined_plot <- ggplot(combined_summary, aes(x = Plot, y = Proportion_Correct, fill = Phase)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("steelblue", "darkorange")) +
+  ylim(0, 1) +
+  labs(
+    title = "Pre-Post-Test Plot",
+    x = "Plot Type",
+    y = "Proportion Correct"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 30, hjust = 1)  
+  )
+```
+
+```{r include=FALSE}
+ggsave("pre_post_comparison.png", plot = combined_plot, width = 4, height = 5, dpi = 150)
+```
+
+```{r include=FALSE}
+knitr::include_graphics("mrl_plot.png")
+```
+
+
+
+
+### Pre test assessment decision tree
+
+```{r include=FALSE}
+# Convert outcome to factor
+survey_data$Pre_MRL_Correct <- as.factor(toupper(survey_data$Pre_MRL_Correct))
+survey_data$Post_MRL_Correct <- as.factor(toupper(survey_data$Post_MRL_Correct))
+```
+
+```{r include=FALSE}
+# Rename the relevant columns (columns 16 to 23 based on your list)
+names(survey_data)[16:23] <- c(
+  "Rank_KM", "Rank_SurvDiff", "Rank_MRL", "Rank_MRLDiff",
+  "Pref_KM", "Pref_SurvDiff", "Pref_MRL", "Pref_MRLDiff"
+)
+```
+
+```{r include=FALSE}
+#Build the decision tree
+tree_pre_mrl <- rpart(
+  Pre_MRL_Correct ~ Rank_KM + Rank_SurvDiff + Rank_MRL + Rank_MRLDiff +
+    Pref_KM + Pref_SurvDiff + Pref_MRL + Pref_MRLDiff,
+  data = survey_data,
+  method = "class",
+  control = rpart.control(cp = 0.01, minsplit = 5)
+)
+```
+
+```{r echo=FALSE}
+#pre test tree
+rpart.plot(tree_pre_mrl, type = 3, extra = 104,
+           main = "Decision Tree – Pre-Test Interpretation of MRL")
+```
+
+
+### Post test assessment decision tree
+
+```{r include=FALSE}
+#Build Post test tree
+tree_post_mrl <- rpart(
+  Post_MRL_Correct ~ Rank_KM + Rank_SurvDiff + Rank_MRL + Rank_MRLDiff +
+    Pref_KM + Pref_SurvDiff + Pref_MRL + Pref_MRLDiff,
+  data = survey_data,
+  method = "class",
+  control = rpart.control(cp = 0.01, minsplit = 5)
+)
+```
+
+```{r echo=FALSE, fig.width=5, fig.height=6, fig.align='center', fig.cap="Decision Tree – Post-Test Interpretation of MRL"}
+rpart.plot(tree_post_mrl, type = 3, extra = 104,
+           main = "Decision Tree – Post-Test Interpretation of MRL")
+```
+
+
+###code for Ranking of the plots 
+
+
+```{r include=FALSE}
+library(tidyverse)
+```
+
+```{r include=FALSE}
+# Rename ranking columns for simplicity
+colnames(survey_data)[16:23] <- c(
+  "Rank_KM", "Rank_SurvDiff", "Rank_MRL", "Rank_MRLDiff",
+  "Pref_KM", "Pref_SurvDiff", "Pref_MRL", "Pref_MRLDiff"
+)
+```
+
+```{r include=FALSE}
+# Convert to long format for both "easy to understand" and "use with patient"
+ranking_long <- survey_data %>%
+  select(Rank_KM, Rank_SurvDiff, Rank_MRL, Rank_MRLDiff,
+         Pref_KM, Pref_SurvDiff, Pref_MRL, Pref_MRLDiff) %>%
+  pivot_longer(everything(), names_to = "Measure", values_to = "Rank") %>%
+  mutate(
+    Preference = ifelse(str_detect(Measure, "^Rank"), "Easy to understand", "use with patient"),
+    Plot = case_when(
+      str_detect(Measure, "KM") ~ "Kaplan Meier(KM)",
+      str_detect(Measure, "SurvDiff") ~ "Survival difference",
+      str_detect(Measure, "MRL$") ~ "Mean Residual Life",
+      str_detect(Measure, "MRLDiff") ~ "MRL difference"
+    ),
+    Rank = as.factor(Rank)
+  )
+```
+
+```{r echo=FALSE, fig.pos='H', message=FALSE, warning=FALSE}
+# Generate the plot
+ranking_plot <- ggplot(ranking_long, aes(x = Rank, fill = Preference)) +
+  geom_bar(position = "dodge") +
+  facet_wrap(~ Plot, nrow = 2, scales = "free_y") +
+  scale_fill_manual(values = c("steelblue", "orange")) +
+  labs(
+    title = "Distribution of Rankings",
+    x = "Rank",
+    y = "Number of Participants",
+    fill = "Preference"
+  ) +
+  coord_cartesian(ylim = c(0, NA)) +  
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  theme_minimal(base_size = 14)
+```
+
+```
+
+```{r include=FALSE}
+#Save the plot
+ggsave("ranking_distribution.png", plot = ranking_plot, units = "cm", width = 15, height = 10, dpi = 300)
+```
+
+```{r echo=FALSE, out.width='100%', fig.align='center'}
+#Include the image
+knitr::include_graphics("ranking_distribution.png")
+
+
